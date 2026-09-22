@@ -61,8 +61,47 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  publish:
+  docker:
     needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      IMAGE: unrea1labs/unreal-agent
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+        with:
+          platforms: arm64
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - name: Build and test both platforms
+        shell: bash
+        run: |
+          for arch in amd64 arm64; do
+            docker buildx build --platform "linux/$arch" --load \
+              --tag "unreal-agent-smoke:$arch" .
+            docker run --rm --platform "linux/$arch" "unreal-agent-smoke:$arch" -h
+          done
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Publish Docker image
+        shell: bash
+        run: |
+          docker buildx build --platform linux/amd64,linux/arm64 --push \
+            --tag "$IMAGE:$RELEASE_TAG" --tag "$IMAGE:latest" \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.version=$RELEASE_TAG" \
+            --label "org.opencontainers.image.licenses=MIT" .
+
+  publish:
+    needs: [build, docker]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
