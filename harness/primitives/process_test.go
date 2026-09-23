@@ -884,7 +884,7 @@ func TestProcessDrainsBufferedOutputAfterExit(t *testing.T) {
 		Path:          "/bin/sh",
 		Arguments: []string{
 			"-c",
-			"/bin/dd if=/dev/zero bs=1024 count=96 2>/dev/null; printf '%d\\n' $$ > \"$1\"; kill -STOP $$",
+			"/bin/dd if=/dev/zero bs=1024 count=96 2>/dev/null; printf '%d\\n' $$ > \"$1\"; read -r line",
 			"sh",
 			marker,
 		},
@@ -896,9 +896,11 @@ func TestProcessDrainsBufferedOutputAfterExit(t *testing.T) {
 
 	pid, outputBytes := waitForProcessPIDAndOutput(t, marker, events)
 	processGone := cleanupProcessPID(t, pid)
-	if err := syscall.Kill(pid, syscall.SIGCONT); err != nil {
-		t.Fatalf("continue process: %v", err)
-	}
+	singleEvent(t, collectEvents(process.WriteInput(t.Context(), primitives.ProcessWriteRequest{
+		Source:        "operation-1",
+		CorrelationID: "release-1",
+		Data:          []byte("\n"),
+	})), primitives.PrimitiveEventProcessInputWritten)
 	waitForProcessGone(t, pid)
 	processGone()
 
