@@ -34,7 +34,7 @@ import (
 
 const (
 	defaultProvider           = "openai"
-	defaultSessionDirectory   = ".harness/sessions"
+	defaultSessionDirectory   = "unreal-agent/sessions"
 	llmAPIKeyEnvironment      = "UNREAL_HARNESS_LLM_API_KEY"
 	llmBaseURLEnvironment     = "UNREAL_HARNESS_LLM_BASE_URL"
 	llmModelEnvironment       = "UNREAL_HARNESS_LLM_MODEL"
@@ -168,9 +168,9 @@ func Run(
 		prompt = &value
 		return nil
 	})
-	sessionDirectory := flags.String("session-directory", defaultSessionDirectory, "directory containing session files")
+	sessionDirectory := flags.String("session-directory", "", "directory containing session files; defaults to $XDG_STATE_HOME/unreal-agent/sessions, or $HOME/.local/state/unreal-agent/sessions")
 	workspaceDirectory := flags.String("workspace", ".", "agent workspace and Bash working directory")
-	logDirectory := flags.String("log-directory", "", "session JSONL log directory; defaults to <workspace>/logs")
+	logDirectory := flags.String("log-directory", "", "optional session JSONL log directory; unset writes only to stdout")
 	toolHeartbeatInterval := flags.Duration("tool-heartbeat-interval", 10*time.Minute, "tool-wait heartbeat interval (0 disables)")
 	if err := flags.Parse(args); err != nil {
 		if usageErr != nil {
@@ -284,7 +284,7 @@ func Run(
 		}
 	}()
 
-	storeDirectory, err := filepath.Abs(strings.TrimSpace(*sessionDirectory))
+	storeDirectory, err := resolveSessionDirectory(*sessionDirectory, getenv)
 	if err != nil {
 		return fmt.Errorf("resolve session directory: %w", err)
 	}
@@ -296,16 +296,19 @@ func Run(
 	if err != nil {
 		return err
 	}
-	logFile, err := openDatetimeLog(resolveLogDirectory(workspace, *logDirectory), time.Now())
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := logFile.Close(); err != nil {
-			runErr = errors.Join(runErr, fmt.Errorf("close session log: %w", err))
+	observedOutput := output
+	if directory := strings.TrimSpace(*logDirectory); directory != "" {
+		logFile, err := openDatetimeLog(directory, time.Now())
+		if err != nil {
+			return err
 		}
-	}()
-	observedOutput := io.MultiWriter(logFile, output)
+		defer func() {
+			if err := logFile.Close(); err != nil {
+				runErr = errors.Join(runErr, fmt.Errorf("close session log: %w", err))
+			}
+		}()
+		observedOutput = io.MultiWriter(logFile, output)
+	}
 
 	runContext, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -494,12 +497,26 @@ func DecodeRequest(input io.Reader, destination any) error {
 	return nil
 }
 
-func resolveLogDirectory(workspace, configured string) string {
-	configured = strings.TrimSpace(configured)
-	if configured == "" {
-		return filepath.Join(workspace, "logs")
+func resolveSessionDirectory(configured string, getenv func(string) string) (string, error) {
+	if configured = strings.TrimSpace(configured); configured != "" {
+		return filepath.Abs(configured)
 	}
-	return configured
+	stateHome := getenv("XDG_STATE_HOME")
+	if !filepath.IsAbs(stateHome) {
+		userHome := getenv("HOME")
+		if userHome == "" {
+			var err error
+			userHome, err = os.UserHomeDir()
+			if err != nil {
+				return "", fmt.Errorf("find home directory: %w; specify -session-directory to override", err)
+			}
+		}
+		if !filepath.IsAbs(userHome) {
+			return "", errors.New("set an absolute XDG_STATE_HOME or HOME, or specify -session-directory")
+		}
+		stateHome = filepath.Join(userHome, ".local", "state")
+	}
+	return filepath.Join(stateHome, defaultSessionDirectory), nil
 }
 
 func openDatetimeLog(directory string, now time.Time) (*os.File, error) {

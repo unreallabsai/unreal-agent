@@ -28,6 +28,9 @@ Choose a workspace and save the output:
 unreal-agent-runner -workspace ./my-project -p 'Summarize this project.' > run.jsonl
 ```
 
+Sessions: `${XDG_STATE_HOME:-$HOME/.local/state}/unreal-agent/sessions`
+(override with `-session-directory`).
+
 You can also pass a JSON request as an argument or through stdin:
 
 ```sh
@@ -49,6 +52,7 @@ with a project mounted as the workspace:
 ```sh
 docker run --rm -i --user "$(id -u):$(id -g)" \
   -e OPENAI_API_KEY -v "$PWD:/workspace" \
+  -v unreal-agent-state:/state \
   unrea1labs/unreal-agent:latest -p 'Summarize this project.'
 ```
 

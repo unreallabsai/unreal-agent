@@ -106,18 +106,24 @@ func TestReadAuthFile(t *testing.T) {
 func TestEnvironmentConfig(t *testing.T) {
 	for _, test := range []struct {
 		name                 string
+		processHome          string
 		env                  map[string]string
 		file, token, account string
 		invalid              bool
 	}{
+		{name: "injected home takes precedence", processHome: "/process/home", env: map[string]string{"HOME": " /injected/home "}, file: "/injected/home/.codex/auth.json"},
+		{name: "injected home without process home", env: map[string]string{"HOME": "/injected/home"}, file: "/injected/home/.codex/auth.json"},
 		{name: "home default", env: map[string]string{"HOME": "/home/example", "OPENAI_API_KEY": "sk-api", "UNREAL_HARNESS_LLM_API_KEY": "sk-generic"}, file: "/home/example/.codex/auth.json"},
+		{name: "process home fallback", processHome: "/process/home", file: "/process/home/.codex/auth.json"},
+		{name: "missing home", invalid: true},
 		{name: "codex home", env: map[string]string{"CODEX_HOME": "/custom/codex"}, file: "/custom/codex/auth.json"},
 		{name: "explicit file", env: map[string]string{"OPENAI_CODEX_AUTH_FILE": "/custom/auth.json"}, file: "/custom/auth.json"},
 		{name: "explicit token", env: map[string]string{"OPENAI_CODEX_ACCESS_TOKEN": " token ", "OPENAI_CODEX_ACCOUNT_ID": " account "}, token: "token", account: "account"},
-		{name: "partial token configuration", env: map[string]string{"OPENAI_CODEX_ACCOUNT_ID": "account", "HOME": "/unused"}, account: "account"},
+		{name: "partial token configuration", env: map[string]string{"OPENAI_CODEX_ACCOUNT_ID": "account"}, account: "account"},
 		{name: "conflict", env: map[string]string{"OPENAI_CODEX_AUTH_FILE": "/file", "OPENAI_CODEX_ACCESS_TOKEN": "token"}, invalid: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("HOME", test.processHome)
 			config, err := EnvironmentConfig(func(key string) string { return test.env[key] })
 			if (err != nil) != test.invalid {
 				t.Fatalf("error = %v", err)

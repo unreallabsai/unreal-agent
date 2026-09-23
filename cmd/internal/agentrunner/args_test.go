@@ -164,6 +164,8 @@ func TestRunMainHelp(t *testing.T) {
 			for _, want := range []string{
 				"test-runner [options] < request.json", "test-runner [options] 'JSON request'", "test-runner [options] -p 'prompt'",
 				"-p prompt", "-workspace", "-session-directory", "-log-directory", "-tool-heartbeat-interval",
+				"$XDG_STATE_HOME/unreal-agent/sessions", "$HOME/.local/state/unreal-agent/sessions",
+				"optional session JSONL log directory; unset writes only to stdout",
 				"Request schema", "messages:", "role:", "content:", "message_id?:", "prompt:", "model:", "max_attempts:",
 				"system_prompt:", "thinking_level:", "session_id:", "disallowed_tools:", "extra_allowed_tools:", "include_partial_messages:",
 			} {

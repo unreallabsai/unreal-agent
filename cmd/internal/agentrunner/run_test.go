@@ -51,10 +51,11 @@ description: Review code.
 		t.Fatal(err)
 	}
 	sessions := t.TempDir()
+	logDirectory := filepath.Join(t.TempDir(), "logs")
 	var stdout, stderr bytes.Buffer
 	code := RunMain(
 		t.Context(),
-		[]string{"-workspace", workspace, "-session-directory", sessions},
+		[]string{"-workspace", workspace, "-session-directory", sessions, "-log-directory", logDirectory},
 		func(name string) string {
 			switch name {
 			case "OPENAI_API_KEY":
@@ -129,7 +130,7 @@ description: Review code.
 			t.Fatalf("input ID %q is not a UUID: %v", id, err)
 		}
 	}
-	logs, err := filepath.Glob(filepath.Join(workspace, "logs", "*.jsonl"))
+	logs, err := filepath.Glob(filepath.Join(logDirectory, "*.jsonl"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -573,11 +574,129 @@ func TestReasoningEffortMapsEveryThinkingLevel(t *testing.T) {
 	}
 }
 
-func TestResolveLogDirectoryDefaultsToWorkspaceLogs(t *testing.T) {
-	if got := resolveLogDirectory("/work", ""); got != filepath.Join("/work", "logs") {
-		t.Fatalf("resolveLogDirectory default = %q", got)
+func TestRunMainWithoutLogDirectoryWritesOnlyStdout(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		args []string
+	}{
+		{name: "unset"},
+		{name: "empty", args: []string{"-log-directory", ""}},
+		{name: "whitespace", args: []string{"-log-directory", "  "}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			workspace := t.TempDir()
+			t.Chdir(workspace)
+			client := &fakeClient{respond: func(context.Context, llm.Request) (llm.Response, error) {
+				return llm.Response{Output: []llm.Item{{
+					Type: llm.ItemMessage, Data: llm.Message{Role: llm.RoleAssistant, Text: "done"},
+				}}}, nil
+			}}
+			args := append([]string{"-workspace", workspace, "-session-directory", t.TempDir(), "-p", "hello"}, test.args...)
+			var stdout, stderr bytes.Buffer
+			code := RunMain(t.Context(), args, func(name string) string {
+				if name == llmAPIKeyEnvironment {
+					return "secret"
+				}
+				return ""
+			}, func() []string { return nil }, strings.NewReader(""), &stdout, &stderr, testConfig(client))
+			if code != 0 {
+				t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+			}
+			if !slices.Contains(itemKinds(t, stdout.String()), sessionstore.ItemModelResponse) {
+				t.Fatal("stdout is missing the model response")
+			}
+			entries, err := os.ReadDir(workspace)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("workspace entries = %v, %v; want no log files or directories", entries, err)
+			}
+		})
 	}
-	if got := resolveLogDirectory("/work", " /elsewhere "); got != "/elsewhere" {
-		t.Fatalf("resolveLogDirectory configured = %q", got)
+}
+
+func TestRunMainUsesDefaultSessionDirectory(t *testing.T) {
+	workspace, stateHome := t.TempDir(), t.TempDir()
+	t.Chdir(workspace)
+	started := false
+	client := &fakeClient{respond: func(context.Context, llm.Request) (llm.Response, error) {
+		if started {
+			return llm.Response{}, nil
+		}
+		started = true
+		return llm.Response{Output: []llm.Item{{
+			Type: llm.ItemToolCall,
+			Data: llm.ToolCall{CallID: "call-1", Name: "Bash", Arguments: `{"command":"printf hello"}`},
+		}}}, nil
+	}}
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	var stdout, stderr bytes.Buffer
+	code := RunMain(ctx, []string{"-workspace", workspace, "-p", "hello"}, func(name string) string {
+		return map[string]string{
+			llmAPIKeyEnvironment: "secret",
+			"XDG_STATE_HOME":     stateHome,
+			"SHELL":              "/bin/sh",
+		}[name]
+	}, func() []string { return nil }, strings.NewReader(""), &stdout, &stderr, testConfig(client))
+	if code != 0 {
+		t.Fatalf("exit = %d, stderr = %q", code, stderr.String())
+	}
+	sessions := filepath.Join(stateHome, "unreal-agent", "sessions")
+	for pattern, wantContent := range map[string]string{
+		"*.session.jsonl": "model_response",
+		filepath.Join("operations", "*", "*", "out"): "hello",
+	} {
+		paths, err := filepath.Glob(filepath.Join(sessions, pattern))
+		if err != nil || len(paths) != 1 {
+			t.Fatalf("stored files for %q = %v, %v; want one", pattern, paths, err)
+		}
+		content, err := os.ReadFile(paths[0])
+		if err != nil || !strings.Contains(string(content), wantContent) {
+			t.Fatalf("stored file %q = %q, %v; want %q", paths[0], content, err, wantContent)
+		}
+	}
+	entries, err := os.ReadDir(workspace)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("workspace entries = %v, %v; want no state in workspace", entries, err)
+	}
+}
+
+func TestResolveSessionDirectory(t *testing.T) {
+	t.Setenv("HOME", "/process/home")
+	workspace := t.TempDir()
+	t.Chdir(workspace)
+	for _, test := range []struct {
+		name, configured, stateHome, userHome, want string
+	}{
+		{name: "XDG state home", stateHome: "/state", userHome: "/home/user", want: "/state/unreal-agent/sessions"},
+		{name: "XDG without home", stateHome: "/state", want: "/state/unreal-agent/sessions"},
+		{name: "home fallback", userHome: "/home/user", want: "/home/user/.local/state/unreal-agent/sessions"},
+		{name: "process home fallback", want: "/process/home/.local/state/unreal-agent/sessions"},
+		{name: "relative XDG ignored", stateHome: "relative/state", userHome: "/home/user", want: "/home/user/.local/state/unreal-agent/sessions"},
+		{name: "absolute override", configured: " /sessions ", stateHome: "/state", userHome: "/home/user", want: "/sessions"},
+		{name: "relative override", configured: "sessions", stateHome: "/state", want: filepath.Join(workspace, "sessions")},
+		{name: "override without environment", configured: "/sessions", want: "/sessions"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := resolveSessionDirectory(test.configured, func(name string) string {
+				return map[string]string{"XDG_STATE_HOME": test.stateHome, "HOME": test.userHome}[name]
+			})
+			if err != nil || got != test.want {
+				t.Fatalf("resolveSessionDirectory = %q, %v; want %q", got, err, test.want)
+			}
+		})
+	}
+}
+
+func TestResolveSessionDirectoryRejectsMissingStateLocation(t *testing.T) {
+	t.Setenv("HOME", "")
+	for _, userHome := range []string{"", "relative/home"} {
+		t.Run(userHome, func(t *testing.T) {
+			_, err := resolveSessionDirectory("", func(name string) string {
+				return map[string]string{"XDG_STATE_HOME": "relative/state", "HOME": userHome}[name]
+			})
+			if err == nil || !strings.Contains(err.Error(), "-session-directory") {
+				t.Fatalf("error = %v, want actionable state location error", err)
+			}
+		})
 	}
 }
