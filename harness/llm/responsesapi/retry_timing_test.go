@@ -102,7 +102,7 @@ func TestExchangeRetryHints(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				header := test.header
 				if header == "date" {
-					header = time.Now().Add(time.Minute).Format(http.TimeFormat)
+					header = time.Now().Add(time.Minute).UTC().Format(http.TimeFormat)
 				}
 				body := retryErrorEvent(test.kind, test.code, test.message)
 				if test.kind == "http" {
