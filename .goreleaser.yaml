@@ -1,0 +1,89 @@
+version: 2
+project_name: unreal-agent
+
+env:
+  - CGO_ENABLED=0
+
+builds:
+  - id: runner
+    main: ./cmd/unreal-agent-runner
+    binary: unreal-agent-runner
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-mod=readonly, -trimpath]
+    ldflags: [-s -w]
+  - id: tui
+    dir: cmd/unreal-agent-tui
+    main: .
+    binary: unreal-agent-tui
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-mod=readonly, -trimpath]
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .FullCommit }}
+      - -X main.date={{ .CommitDate }}
+
+archives:
+  - id: unreal-agent
+    ids: [runner, tui]
+    formats: [tar.gz]
+    name_template: unreal-agent_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files: [LICENSE]
+
+checksum:
+  name_template: SHA256SUMS
+  algorithm: sha256
+
+dockers_v2:
+  - id: runner
+    ids: [runner]
+    dockerfile: Dockerfile.release
+    images: [unrea1labs/unreal-agent]
+    tags:
+      - v{{ .Version }}
+      - '{{ if not .IsSnapshot }}latest{{ end }}'
+    platforms: [linux/amd64, linux/arm64]
+    extra_files: [LICENSE]
+    labels:
+      org.opencontainers.image.source: https://github.com/unreallabsai/unreal-agent
+      org.opencontainers.image.revision: '{{ .FullCommit }}'
+      org.opencontainers.image.version: v{{ .Version }}
+      org.opencontainers.image.licenses: MIT
+
+release:
+  github:
+    owner: unreallabsai
+    name: unreal-agent
+  name_template: '{{ .Tag }}'
+
+homebrew_casks:
+  - name: unreal-agent
+    ids: [unreal-agent]
+    binaries: [unreal-agent-runner, unreal-agent-tui]
+    homepage: https://github.com/unreallabsai/unreal-agent
+    description: Unreal Agent terminal interface and headless runner
+    # Install the TUI aliases and clear quarantine only for this unsigned package.
+    custom_block: |
+      binary "unreal-agent-tui", target: "unreal-agent"
+      binary "unreal-agent-tui", target: "uat"
+      postflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "."], chdir: "."
+        end
+      end
+    repository:
+      owner: unreallabsai
+      name: homebrew-tap
+      branch: main
+      git:
+        url: git@github.com:unreallabsai/homebrew-tap.git
+        # Snapshots generate the cask locally and do not need the deploy key.
+        private_key: '{{ if not .IsSnapshot }}{{ .Env.HOMEBREW_TAP_DEPLOY_KEY }}{{ end }}'
+    commit_author:
+      name: github-actions[bot]
+      email: 41898282+github-actions[bot]@users.noreply.github.com
+
+snapshot:
+  version_template: '{{ incpatch .Version }}-snapshot'
