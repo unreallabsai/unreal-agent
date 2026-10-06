@@ -26,15 +26,10 @@ builds:
       - -X main.date={{ .CommitDate }}
 
 archives:
-  - id: runner
-    ids: [runner]
+  - id: unreal-agent
+    ids: [runner, tui]
     formats: [tar.gz]
-    name_template: unreal-agent-runner_{{ .Version }}_{{ .Os }}_{{ .Arch }}
-    files: [LICENSE]
-  - id: tui
-    ids: [tui]
-    formats: [tar.gz]
-    name_template: unreal-agent-tui_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    name_template: unreal-agent_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     files: [LICENSE]
 
 checksum:
@@ -65,8 +60,34 @@ release:
   github:
     owner: unreallabsai
     name: unreal-agent
-  draft: true
   name_template: '{{ .Tag }}'
+
+homebrew_casks:
+  - name: unreal-agent
+    ids: [unreal-agent]
+    binaries: [unreal-agent-runner, unreal-agent-tui]
+    homepage: https://github.com/unreallabsai/unreal-agent
+    description: Unreal Agent terminal interface and headless runner
+    # Install the TUI aliases and clear quarantine only for this unsigned package.
+    custom_block: |
+      binary "unreal-agent-tui", target: "unreal-agent"
+      binary "unreal-agent-tui", target: "uat"
+      postflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "."], chdir: "."
+        end
+      end
+    repository:
+      owner: unreallabsai
+      name: homebrew-tap
+      branch: main
+      git:
+        url: git@github.com:unreallabsai/homebrew-tap.git
+        # Snapshots generate the cask locally and do not need the deploy key.
+        private_key: '{{ if not .IsSnapshot }}{{ .Env.HOMEBREW_TAP_DEPLOY_KEY }}{{ end }}'
+    commit_author:
+      name: github-actions[bot]
+      email: 41898282+github-actions[bot]@users.noreply.github.com
 
 snapshot:
   version_template: '{{ incpatch .Version }}-snapshot'

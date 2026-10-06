@@ -34,17 +34,6 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - name: Install GoReleaser 2.18.2
-        env:
-          GORELEASER_SHA256: 0a96edc9d9bc594e4a41cc4d59467c182062910ab24d9d1f6dd7b667d32606d3
-        run: |
-          curl --fail --silent --show-error --location \
-            https://github.com/goreleaser/goreleaser/releases/download/v2.18.2/goreleaser_Linux_x86_64.tar.gz \
-            --output "$RUNNER_TEMP/goreleaser.tar.gz"
-          printf '%s  %s\n' "$GORELEASER_SHA256" "$RUNNER_TEMP/goreleaser.tar.gz" | sha256sum --check
-          tar -xzf "$RUNNER_TEMP/goreleaser.tar.gz" -C "$RUNNER_TEMP" goreleaser
-          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
-      - run: goreleaser check
       - run: make test check
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
         with:
@@ -54,20 +43,11 @@ jobs:
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build binaries once; publish Docker and draft release assets
+      - name: Publish binaries, Docker images, and Homebrew cask
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          version: v2.18.2
+          args: release --clean --fail-fast
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: goreleaser release --clean --fail-fast
-      - name: Publish the completed release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
-
-  homebrew:
-    needs: release
-    permissions:
-      contents: read
-    uses: ./.github/workflows/homebrew.yml
-    with:
-      release_tag: ${{ github.ref_name }}
+          HOMEBREW_TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
