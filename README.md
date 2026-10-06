@@ -4,6 +4,8 @@ An async-first agent harness from Unreal Labs.
 
 - [harness/](harness/) — the library.
 - [cmd/](cmd/) — executables that use the library.
+  - [cmd/](cmd/unreal-agent-runner) - agent runner.
+  - [cmd/](cmd/unreal-agent-tui) - cosy TUI.
 - [benchmarks/](benchmarks/) — benchmark runners.
 
 ## Glossary
@@ -53,3 +55,7 @@ We intend to preserve these invariants:
 For example, a proxy operations manager can send serialized operations to a
 local operations manager running in a process inside a remote sandbox, allowing
 tools to execute there.
+
+## TUI
+
+Experimental TUI available 
