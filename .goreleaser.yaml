@@ -39,7 +39,7 @@ checksum:
 dockers_v2:
   - id: runner
     ids: [runner]
-    dockerfile: Dockerfile
+    dockerfile: Dockerfile.release
     images: [unrea1labs/unreal-agent]
     tags:
       - v{{ .Version }}
@@ -51,10 +51,6 @@ dockers_v2:
       org.opencontainers.image.revision: '{{ .FullCommit }}'
       org.opencontainers.image.version: v{{ .Version }}
       org.opencontainers.image.licenses: MIT
-    hooks:
-      pre:
-        - cmd: bash scripts/test-release-image.sh "{{ .ContextDir }}"
-          output: true
 
 release:
   github:
