@@ -7,9 +7,18 @@ Publish Homebrew to update `unreallabsai/homebrew-tap`.
 
 The TUI archives include the release version, source commit and commit date in
 `unreal-agent -version`. Each archive includes its executable and MIT license.
-`SHA256SUMS` covers all eight archives. The tap generator verifies their hashes,
-contents and executable permissions before writing the formulae. It rejects
-updates that would downgrade the tap.
+`SHA256SUMS` covers all eight archives.
+
+The Homebrew update has three steps:
+
+1. Verify the downloaded archives against `SHA256SUMS`.
+2. Fill in the version and four platform checksums in each of the two
+   [formula templates](homebrew/).
+3. Commit the formulae and aliases to the tap.
+
+The publishing workflow only accepts the latest stable release, so retries of
+older releases cannot downgrade the tap. The formula templates contain the
+install commands and the Homebrew tests.
 
 `unreal-agent` installs the TUI and depends on `unreal-agent-runner`. The TUI
 executable has `unreal-agent` and `uat` symlinks; the tap also accepts
@@ -33,8 +42,7 @@ events created with `GITHUB_TOKEN` do not start additional workflows.
 
 ```sh
 bash scripts/build-release.sh v0.3.0
-python3 scripts/generate-homebrew.py v0.3.0 dist /path/to/homebrew-tap
-python3 -m unittest discover -s scripts -p '*_test.py'
+bash scripts/update-homebrew.sh v0.3.0 dist /path/to/homebrew-tap
 brew style unreallabsai/tap/unreal-agent unreallabsai/tap/unreal-agent-runner
 brew test unreallabsai/tap/unreal-agent
 brew test unreallabsai/tap/unreal-agent-runner

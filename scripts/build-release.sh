@@ -29,15 +29,11 @@ for target_os in linux darwin; do
     done
   done
 done
-python3 - "$version" <<'PY'
-import hashlib
-import pathlib
-import sys
-
-dist = pathlib.Path("dist")
-archives = sorted(dist.glob(f"unreal-agent-*_{sys.argv[1]}_*.tar.gz"))
-with (dist / "SHA256SUMS").open("w") as checksums:
-    for archive in archives:
-        digest = hashlib.sha256(archive.read_bytes()).hexdigest()
-        checksums.write(f"{digest}  ./{archive.name}\n")
-PY
+(
+  cd dist
+  if command -v sha256sum >/dev/null; then
+    sha256sum ./unreal-agent-*_${version}_*.tar.gz > SHA256SUMS
+  else
+    shasum -a 256 ./unreal-agent-*_${version}_*.tar.gz > SHA256SUMS
+  fi
+)

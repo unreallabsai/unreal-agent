@@ -44,6 +44,9 @@ jobs:
           [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
             --json isDraft,isPrerelease --jq 'if .isDraft or .isPrerelease then error("expected a published stable release") else . end'
+          # Only the latest stable release may update the tap.
+          latest_tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq '.tagName')
+          [[ "$RELEASE_TAG" == "$latest_tag" ]]
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: unreallabsai/homebrew-tap
@@ -54,7 +57,7 @@ jobs:
         run: |
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir dist \
             --pattern '*.tar.gz' --pattern SHA256SUMS
-          python3 scripts/generate-homebrew.py "$RELEASE_TAG" dist homebrew-tap
+          bash scripts/update-homebrew.sh "$RELEASE_TAG" dist homebrew-tap
           ruby -c homebrew-tap/Formula/unreal-agent.rb
           ruby -c homebrew-tap/Formula/unreal-agent-runner.rb
       - name: Publish tap update

@@ -10,18 +10,6 @@ on:
 permissions: {}
 
 jobs:
-  release-packaging:
-    runs-on: ubuntu-26.04
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-      - name: Verify release archive and tap safeguards
-        run: python3 -m unittest discover -s scripts -p '*_test.py'
-
   go:
     strategy:
       fail-fast: false
