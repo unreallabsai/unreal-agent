@@ -4,6 +4,8 @@ An async-first agent harness from Unreal Labs.
 
 - [harness/](harness/) — the library.
 - [cmd/](cmd/) — executables that use the library.
+  - [cmd/unreal-agent-runner](cmd/unreal-agent-runner) - cloud agent runner.
+  - [cmd/unreal-agent-tui](cmd/unreal-agent-tui) - cozy TUI.
 - [benchmarks/](benchmarks/) — benchmark runners.
 
 ## Install
