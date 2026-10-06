@@ -116,5 +116,3 @@ jobs:
     uses: ./.github/workflows/homebrew.yml
     with:
       release_tag: ${{ github.ref_name }}
-    secrets:
-      HOMEBREW_TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}

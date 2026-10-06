@@ -26,11 +26,13 @@ executable has `unreal-agent` and `uat` symlinks; the tap also accepts
 
 ## Tap credentials
 
-The source repository's `HOMEBREW_TAP_DEPLOY_KEY` Actions secret contains a
-dedicated SSH private key. Its public key is a write-enabled deploy key on
-`unreallabsai/homebrew-tap`. No personal access token is required. To rotate it,
-create a new key, add the public deploy key to the tap, replace the Actions
-secret, and remove the old deploy key.
+The source repository's `release-env` environment contains the
+`HOMEBREW_TAP_DEPLOY_KEY` Actions secret, a dedicated SSH private key. Its public
+key is a write-enabled deploy key on `unreallabsai/homebrew-tap`. The Homebrew
+job uses `environment: release-env` to access it directly; the caller does not
+pass a repository secret. No personal access token is required. To rotate it,
+create a new key, add the public deploy key to the tap, replace the secret in
+`release-env`, and remove the old deploy key.
 
 ## Recovery and local verification
 
@@ -39,6 +41,13 @@ workflow manually with that release's tag. It downloads the published assets
 again and safely skips an unchanged formula. Manually published GitHub releases
 also trigger that workflow; the Release workflow calls it directly because
 events created with `GITHUB_TOKEN` do not start additional workflows.
+
+`release-env` permits deployments from `v*` tags. For a manual retry, select the
+release tag as the workflow's ref as well as its `release_tag` input:
+
+```sh
+gh workflow run homebrew.yml --ref v0.3.1 -f release_tag=v0.3.1
+```
 
 ```sh
 bash scripts/build-release.sh v0.3.0

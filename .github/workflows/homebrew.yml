@@ -6,9 +6,6 @@ on:
       release_tag:
         required: true
         type: string
-    secrets:
-      HOMEBREW_TAP_DEPLOY_KEY:
-        required: true
   workflow_dispatch:
     inputs:
       release_tag:
@@ -28,6 +25,7 @@ jobs:
   publish:
     if: github.repository == 'unreallabsai/unreal-agent' && !github.event.release.prerelease
     runs-on: ubuntu-26.04
+    environment: release-env
     timeout-minutes: 10
     permissions:
       contents: read
