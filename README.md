@@ -8,26 +8,6 @@ An async-first agent harness from Unreal Labs.
   - [cmd/unreal-agent-tui](cmd/unreal-agent-tui) - cozy TUI.
 - [benchmarks/](benchmarks/) — benchmark runners.
 
-## Install
-
-Install prebuilt binaries with Homebrew on macOS or Linux (ARM64 or AMD64):
-
-```sh
-brew tap unreallabsai/tap
-brew install unreallabsai/tap/unreal-agent
-unreal-agent
-```
-
-This installs `unreal-agent-runner` and `unreal-agent-tui`. Both `unreal-agent`
-and `uat` launch the TUI. See the [TUI guide](cmd/unreal-agent-tui/) for provider
-setup and the [runner guide](cmd/unreal-agent-runner/) for non-interactive use.
-To install only the runner, use `brew install unreallabsai/tap/unreal-agent-runner`.
-Upgrade with `brew update && brew upgrade unreal-agent`.
-
-Every stable release publishes archives for both binaries and updates the
-[Homebrew tap](https://github.com/unreallabsai/homebrew-tap).
-See [release maintenance](scripts/README.md) for publishing and recovery.
-
 ## Glossary
 
 - **Input**: an event with a caller-supplied globally unique ID that remains
