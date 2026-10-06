@@ -4,8 +4,8 @@ An async-first agent harness from Unreal Labs.
 
 - [harness/](harness/) — the library.
 - [cmd/](cmd/) — executables that use the library.
-  - [cmd/](cmd/unreal-agent-runner) - agent runner.
-  - [cmd/](cmd/unreal-agent-tui) - cosy TUI.
+  - [agent runner](cmd/unreal-agent-runner) - agent runner.
+  - [tui](cmd/unreal-agent-tui) - cozy TUI.
 - [benchmarks/](benchmarks/) — benchmark runners.
 
 ## Glossary
