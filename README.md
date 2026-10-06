@@ -56,6 +56,3 @@ For example, a proxy operations manager can send serialized operations to a
 local operations manager running in a process inside a remote sandbox, allowing
 tools to execute there.
 
-## TUI
-
-Experimental TUI available 
