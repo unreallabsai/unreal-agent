@@ -11,12 +11,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  release:
     if: github.repository == 'unreallabsai/unreal-agent'
-    runs-on: ubuntu-24.04
+    environment: release-env
+    runs-on: ubuntu-26.04
     timeout-minutes: 25
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -33,84 +34,38 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - run: make test check
-      - name: Build archives
+      - name: Install GoReleaser 2.18.2
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: bash scripts/build-release.sh "$RELEASE_TAG"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: release
-          path: |
-            dist/*.tar.gz
-            dist/SHA256SUMS
-          if-no-files-found: error
-          retention-days: 7
-
-  docker:
-    needs: build
-    environment: release-env
-    runs-on: ubuntu-24.04
-    timeout-minutes: 25
-    permissions:
-      contents: read
-    env:
-      IMAGE: unrea1labs/unreal-agent
-      RELEASE_TAG: ${{ github.ref_name }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
+          GORELEASER_SHA256: 0a96edc9d9bc594e4a41cc4d59467c182062910ab24d9d1f6dd7b667d32606d3
+        run: |
+          curl --fail --silent --show-error --location \
+            https://github.com/goreleaser/goreleaser/releases/download/v2.18.2/goreleaser_Linux_x86_64.tar.gz \
+            --output "$RUNNER_TEMP/goreleaser.tar.gz"
+          printf '%s  %s\n' "$GORELEASER_SHA256" "$RUNNER_TEMP/goreleaser.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/goreleaser.tar.gz" -C "$RUNNER_TEMP" goreleaser
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - run: goreleaser check
+      - run: make test check
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
         with:
           platforms: arm64
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-      - name: Build and test both platforms
-        shell: bash
-        run: |
-          for arch in amd64 arm64; do
-            docker buildx build --platform "linux/$arch" --load \
-              --tag "unreal-agent-smoke:$arch" .
-            docker run --rm --platform "linux/$arch" "unreal-agent-smoke:$arch" -h
-          done
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Publish Docker image
-        shell: bash
-        run: |
-          docker buildx build --platform linux/amd64,linux/arm64 --push \
-            --tag "$IMAGE:$RELEASE_TAG" --tag "$IMAGE:latest" \
-            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
-            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
-            --label "org.opencontainers.image.version=$RELEASE_TAG" \
-            --label "org.opencontainers.image.licenses=MIT" .
-
-  publish:
-    needs: [build, docker]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: release
-          path: dist
-      - name: Verify checksums
-        working-directory: dist
-        run: sha256sum --check SHA256SUMS
-      - name: Publish release
+      - name: Build binaries once; publish Docker and draft release assets
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: goreleaser release --clean --fail-fast
+      - name: Publish the completed release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          gh release create "$RELEASE_TAG" dist/*.tar.gz dist/SHA256SUMS \
-            --repo "$GITHUB_REPOSITORY" --verify-tag --title "$RELEASE_TAG" --generate-notes
+        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
 
   homebrew:
-    needs: publish
+    needs: release
     permissions:
       contents: read
     uses: ./.github/workflows/homebrew.yml

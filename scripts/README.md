@@ -1,9 +1,17 @@
 # Release maintenance
 
-Push a stable `vMAJOR.MINOR.PATCH` tag whose commit is on `main`. The Release
-workflow tests the code, builds runner and TUI archives for macOS and Linux on
-ARM64 and AMD64, publishes Docker images and a GitHub release, then calls
-Publish Homebrew to update `unreallabsai/homebrew-tap`.
+After the publishing PR is merged, push a stable `vMAJOR.MINOR.PATCH` tag whose
+commit is on `main`. The Release workflow tests the code and runs the root
+[`.goreleaser.yaml`](../.goreleaser.yaml) configuration using GoReleaser 2.18.2.
+It builds the runner and TUI once for each macOS/Linux and ARM64/AMD64 target,
+creates the release archives, and copies those same Linux runner binaries into
+Docker images using [Dockerfile.release](../Dockerfile.release).
+
+The Docker pre-hook builds and smoke-tests both image platforms before pushing.
+GoReleaser uploads the archives to a draft GitHub release. Once it succeeds,
+the workflow publishes that release and calls Publish Homebrew to update
+`unreallabsai/homebrew-tap`. The original Dockerfile supports source builds for
+development and CI.
 
 The TUI archives include the release version, source commit and commit date in
 `unreal-agent -version`. Each archive includes its executable and MIT license.
@@ -50,8 +58,13 @@ gh workflow run homebrew.yml --ref v0.3.1 -f release_tag=v0.3.1
 ```
 
 ```sh
-bash scripts/build-release.sh v0.3.0
-bash scripts/update-homebrew.sh v0.3.0 dist /path/to/homebrew-tap
+goreleaser check
+# Local binaries, archives, checksums, and Docker images; nothing is published.
+goreleaser release --snapshot --clean
+# Skip Docker when only verifying the release archives.
+goreleaser release --snapshot --clean --skip=docker
+# Updating the tap requires a published stable release and its downloaded assets.
+bash scripts/update-homebrew.sh v0.3.1 dist /path/to/homebrew-tap
 brew style unreallabsai/tap/unreal-agent unreallabsai/tap/unreal-agent-runner
 brew test unreallabsai/tap/unreal-agent
 brew test unreallabsai/tap/unreal-agent-runner

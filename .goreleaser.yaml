@@ -1,0 +1,72 @@
+version: 2
+project_name: unreal-agent
+
+env:
+  - CGO_ENABLED=0
+
+builds:
+  - id: runner
+    main: ./cmd/unreal-agent-runner
+    binary: unreal-agent-runner
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-mod=readonly, -trimpath]
+    ldflags: [-s -w]
+  - id: tui
+    dir: cmd/unreal-agent-tui
+    main: .
+    binary: unreal-agent-tui
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-mod=readonly, -trimpath]
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .FullCommit }}
+      - -X main.date={{ .CommitDate }}
+
+archives:
+  - id: runner
+    ids: [runner]
+    formats: [tar.gz]
+    name_template: unreal-agent-runner_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files: [LICENSE]
+  - id: tui
+    ids: [tui]
+    formats: [tar.gz]
+    name_template: unreal-agent-tui_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files: [LICENSE]
+
+checksum:
+  name_template: SHA256SUMS
+  algorithm: sha256
+
+dockers_v2:
+  - id: runner
+    ids: [runner]
+    dockerfile: Dockerfile.release
+    images: [unrea1labs/unreal-agent]
+    tags:
+      - v{{ .Version }}
+      - '{{ if not .IsSnapshot }}latest{{ end }}'
+    platforms: [linux/amd64, linux/arm64]
+    extra_files: [LICENSE]
+    labels:
+      org.opencontainers.image.source: https://github.com/unreallabsai/unreal-agent
+      org.opencontainers.image.revision: '{{ .FullCommit }}'
+      org.opencontainers.image.version: v{{ .Version }}
+      org.opencontainers.image.licenses: MIT
+    hooks:
+      pre:
+        - cmd: bash scripts/test-release-image.sh "{{ .ContextDir }}"
+          output: true
+
+release:
+  github:
+    owner: unreallabsai
+    name: unreal-agent
+  draft: true
+  name_template: '{{ .Tag }}'
+
+snapshot:
+  version_template: '{{ incpatch .Version }}-snapshot'
