@@ -3,10 +3,10 @@
 Run an AI agent from a prompt or JSON request. It writes events to stdout as
 JSONL and exits when the task finishes.
 
-Install the prebuilt runner with Homebrew:
+Install the prebuilt runner and TUI with Homebrew:
 
 ```sh
-brew install unreallabsai/tap/unreal-agent-runner
+brew install unreallabsai/tap/unreal-agent
 ```
 
 Or install with Go 1.27+:
