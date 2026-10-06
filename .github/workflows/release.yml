@@ -27,7 +27,7 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         shell: bash
         run: |
-          [[ "$RELEASE_TAG" =~ ^v[01]\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
           git merge-base --is-ancestor HEAD origin/main
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
@@ -37,21 +37,7 @@ jobs:
       - name: Build archives
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-          CGO_ENABLED: '0'
-        shell: bash
-        run: |
-          mkdir -p dist
-          for target_os in linux darwin; do
-            for target_arch in amd64 arm64; do
-              archive="unreal-agent-runner_${RELEASE_TAG#v}_${target_os}_${target_arch}"
-              mkdir -p "dist/$archive"
-              GOOS="$target_os" GOARCH="$target_arch" go build -mod=readonly -trimpath \
-                -o "dist/$archive/unreal-agent-runner" ./cmd/unreal-agent-runner
-              cp LICENSE "dist/$archive/"
-              tar -czf "dist/$archive.tar.gz" -C "dist/$archive" unreal-agent-runner LICENSE
-            done
-          done
-          (cd dist && sha256sum ./*.tar.gz > SHA256SUMS)
+        run: bash scripts/build-release.sh "$RELEASE_TAG"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release
@@ -122,3 +108,13 @@ jobs:
         run: |
           gh release create "$RELEASE_TAG" dist/*.tar.gz dist/SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" --verify-tag --title "$RELEASE_TAG" --generate-notes
+
+  homebrew:
+    needs: publish
+    permissions:
+      contents: read
+    uses: ./.github/workflows/homebrew.yml
+    with:
+      release_tag: ${{ github.ref_name }}
+    secrets:
+      HOMEBREW_TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}

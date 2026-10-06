@@ -3,7 +3,13 @@
 Run an AI agent from a prompt or JSON request. It writes events to stdout as
 JSONL and exits when the task finishes.
 
-Install with Go 1.27+:
+Install the prebuilt runner with Homebrew:
+
+```sh
+brew install unreallabsai/tap/unreal-agent-runner
+```
+
+Or install with Go 1.27+:
 
 ```sh
 go install github.com/unreallabsai/unreal-agent/cmd/unreal-agent-runner@latest
