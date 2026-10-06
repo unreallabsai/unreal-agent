@@ -88,5 +88,11 @@ jobs:
           enable-cache: false
       - run: make -C benchmarks/harbor test check build BUNDLE=../../bin/harbor/ci
       - run: make -C benchmarks/harbor smoke BUNDLE=../../bin/harbor/ci
-      - run: docker build -t unreal-agent-ci .
-      - run: docker run --rm unreal-agent-ci -h
+      - name: Build and smoke-test Docker
+        run: |
+          image_context="$RUNNER_TEMP/unreal-agent-image"
+          mkdir -p "$image_context/linux/amd64"
+          cp bin/harbor/ci/unreal-agent-runner "$image_context/linux/amd64/"
+          cp LICENSE "$image_context/"
+          docker build --platform linux/amd64 -f Dockerfile -t unreal-agent-ci "$image_context"
+          docker run --rm --platform linux/amd64 unreal-agent-ci -h

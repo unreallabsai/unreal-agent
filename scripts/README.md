@@ -23,9 +23,9 @@ One `brew install unreallabsai/tap/unreal-agent` installs both binaries.
 `unreal-agent` and `uat` launch `unreal-agent-tui`. The cask clears quarantine
 only from its own binaries on macOS because these builds are not notarized.
 
-The same `Dockerfile` supports both paths: normal `docker build` commands compile
-from source; GoReleaser selects `--target=prebuilt` to reuse its runner binaries.
-Both targets share the runtime image configuration.
+`Dockerfile` is a single runtime image that copies and runs the compiled runner.
+GoReleaser supplies that binary for releases; CI reuses its existing Harbor
+runner bundle. Use the GoReleaser snapshot command below for local Docker builds.
 
 ## Credentials
 
