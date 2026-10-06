@@ -3,7 +3,7 @@
 A minimal terminal client for Harness. Run it from your workspace:
 
 ```sh
-go -C cmd/unreal-agent-tui install .
+go install github.com/unreallabsai/unreal-agent/cmd/unreal-agent-tui@latest
 unreal-agent-tui
 unreal-agent-tui -provider ollama -model qwen3.8:27b
 unreal-agent-tui -provider openai -model MODEL -theme catppuccin-dark
