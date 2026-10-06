@@ -39,7 +39,8 @@ checksum:
 dockers_v2:
   - id: runner
     ids: [runner]
-    dockerfile: Dockerfile.release
+    dockerfile: Dockerfile
+    flags: [--target=prebuilt]
     images: [unrea1labs/unreal-agent]
     tags:
       - v{{ .Version }}
